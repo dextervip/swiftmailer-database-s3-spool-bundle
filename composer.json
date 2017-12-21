@@ -10,7 +10,7 @@
     }],
     "require" : {
     	"php": ">=5.4.0",
-    	"doctrine/orm": "^2.3",
+    	"doctrine/orm": "^3.0",
     	"symfony/swiftmailer-bundle": "^2.3",
         "aws/aws-sdk-php": "^3.0"
     },

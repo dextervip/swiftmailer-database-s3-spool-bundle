@@ -175,8 +175,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
         $this->transport = $transport;
         $this->failedRecipients = (array) $failedRecipients;
 
-        $count = $this->sendMessages('unsent');
-        $count += $this->sendMessages('retries');
+        $count = $this->sendMessages();
 
         return $count;
     }
@@ -184,13 +183,12 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
     /**
      * Sends messages using the given transport instance and status.
      *
-     * @param string    $status    Message status
      *
      * @return int The number of sent e-mail's
      */
-    protected function sendMessages($status)
+    protected function sendMessages()
     {
-        $queuedMessages = $this->fetchMessages($status);
+        $queuedMessages = $this->fetchMessages();
 
         if (!$queuedMessages || count($queuedMessages) == 0) {
             return 0;
@@ -264,7 +262,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
      *
      * @return MailQueue[]
      */
-    protected function fetchMessages($status = 'unsent')
+    protected function fetchMessages()
     {
 
         $destination = $this->amqpContext->createQueue('cgonser_mail_queue');

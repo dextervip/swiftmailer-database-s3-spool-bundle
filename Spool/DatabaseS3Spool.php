@@ -2,6 +2,10 @@
 
 namespace Cgonser\SwiftMailerDatabaseS3SpoolBundle\Spool;
 
+use Cgonser\SwiftMailerDatabaseS3SpoolBundle\Entity\MailQueue;
+use Enqueue\AmqpTools\RabbitMqDlxDelayStrategy;
+use Interop\Amqp\AmqpContext;
+use Interop\Amqp\AmqpQueue;
 use Swift_Mime_Message;
 use Swift_Transport;
 use Swift_ConfigurableSpool;
@@ -53,6 +57,16 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
     protected $transport;
 
     /**
+     * @var AmqpContext
+     */
+    protected $amqpContext;
+
+    /**
+     * @var AmqpQueue
+     */
+    protected $amqpQueue;
+
+    /**
      * Max retries
      * @var int
      */
@@ -64,7 +78,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
      * @param Registry  $doctrine
      */
 
-    public function __construct($s3Config, $entityClass, Registry $doctrine, String $queue = 'default')
+    public function __construct($s3Config, $entityClass, Registry $doctrine, AmqpContext $amqpContext, String $queue = 'default')
     {
         $this->s3Bucket = $s3Config['bucket'];
         unset ($s3Config['bucket']);
@@ -79,7 +93,10 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
         $this->doctrine = $doctrine;
         $this->entityClass = $entityClass;
         $this->entityManager = $this->doctrine->getManagerForClass($this->entityClass);
+        $this->amqpContext = $amqpContext;
         $this->queue = $queue;
+
+        $this->setupQueue($amqpContext);
     }
 
     /**
@@ -138,7 +155,11 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
         $this->entityManager->persist($object);
         $this->entityManager->flush();
 
-        return $this->s3StoreMessage($object->getId(), $message);
+        $result = $this->s3StoreMessage($object->getId(), $message);
+
+        $this->queueMail($object);
+
+        return $result;
     }
 
     /**
@@ -183,7 +204,9 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
         $count = 0;
 
         foreach ($queuedMessages as $mailQueueObject) {
+            /** @var $mailQueueObject MailQueue */
             $mailQueueObject->setStartedAt(new \DateTime());
+            $mailQueueObject->increaseRetriesCount();
             $this->entityManager->persist($mailQueueObject);
         }
         $this->entityManager->flush();
@@ -223,6 +246,10 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
             $this->s3ArquiveMessage($mailQueueObject->getId());
         } catch (\Exception $e) {
             $mailQueueObject->setErrorMessage($e->getMessage());
+            if($this->maxRetries >= $mailQueueObject->getRetries()){
+                // retry and insert again into the queue with a delay
+                $this->queueMail($mailQueueObject, 60 * ($mailQueueObject->getRetries() + 1));
+            }
             $this->entityManager->persist($mailQueueObject);
             $count = 0;
         }
@@ -240,61 +267,30 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
     protected function fetchMessages($status = 'unsent')
     {
 
-        switch ($status) {
-            case 'unsent':
-                $sql = "UPDATE cgonser_mail_queue
-                        SET lock = NOW()
-                        WHERE id IN (
-                            SELECT id FROM cgonser_mail_queue
-                            WHERE queue = :queue
-                            AND sent_at IS NULL
-                            AND (sent_at IS NULL OR sent_at <= NOW())
-                            AND started_at IS NULL
-                            AND (lock IS NULL OR lock < NOW() - INTERVAL '30 MINUTES')
-                            ORDER BY queued_at ASC
-                            LIMIT :limit
-                            FOR UPDATE SKIP LOCKED
-                        ) RETURNING id;";
+        $destination = $this->amqpContext->createQueue('cgonser_mail_queue');
+        $consumer = $this->amqpContext->createConsumer($destination);
 
-                $stmt = $this->entityManager->getConnection()->prepare($sql);
-                $stmt->execute([
-                    ':queue' => $this->queue,
-                    ':limit' => empty($this->getMessageLimit()) ? 1000 : $this->getMessageLimit(),
-                ]);
-                break;
-            case 'retries':
-                $sql = "UPDATE cgonser_mail_queue
-                        SET lock = NOW(),
-                        max_retries = max_retries + 1
-                        WHERE id IN (
-                            SELECT id FROM cgonser_mail_queue
-                            WHERE queue = :queue
-                            AND sent_at IS NULL
-                            AND started_at IS NOT NULL
-                            AND (lock IS NULL OR lock < NOW() - INTERVAL '30 MINUTES')
-                            AND max_retries < :max_retries
-                            ORDER BY queued_at ASC
-                            LIMIT :limit
-                            FOR UPDATE SKIP LOCKED
-                        ) RETURNING id;";
+        $limit = empty($this->getMessageLimit()) ? 100 : $this->getMessageLimit();
 
-                $stmt = $this->entityManager->getConnection()->prepare($sql);
-                $stmt->execute([
-                    ':queue' => $this->queue,
-                    ':limit' => empty($this->getMessageLimit()) ? 1000 : $this->getMessageLimit(),
-                    ':max_retries' => $this->maxRetries
-                ]);
+        $ids = [];
+        for ($i = 0; $i <= $limit; $i++){
+            $message = $consumer->receive(10);
+            if(empty($message)){
                 break;
+            }
+            $ids[]=json_decode($message->getBody(), true);
+            $consumer->acknowledge($message);
         }
 
-        $result = $stmt->fetchAll();
+        if(count($ids) > 0 ) {
+            $qb = $this->entityManager->getRepository($this->entityClass)
+                ->createQueryBuilder('m');
+            $qb->andWhere($qb->expr()->in('m.id', ':ids'))
+                ->setParameter(':ids', array_column($ids, 'id'));
+            return $qb->getQuery()->getResult();
+        }
 
-        $qb = $this->entityManager->getRepository($this->entityClass)
-            ->createQueryBuilder('m');
-        $qb->andWhere($qb->expr()->in('m.id', ':ids'))
-            ->setParameter(':ids', array_column($result, 'id'));
-
-        return $qb->getQuery()->getResult();
+        return [];
     }
 
     /**
@@ -401,5 +397,39 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
             },
             (array) $addresses
         ));
+    }
+
+    /**
+     * @param $context
+     */
+    protected function setupQueue(AmqpContext $context)
+    {
+        $this->amqpQueue = $this->amqpContext->createQueue('cgonser_mail_queue');
+        $this->amqpQueue->addFlag(AmqpQueue::FLAG_DURABLE);
+        $context->declareQueue($this->amqpQueue);
+    }
+
+    /**
+     * @param $object MailQueue
+     * @param $delaySeconds int
+     * @throws \Interop\Queue\Exception
+     * @throws \Interop\Queue\InvalidDestinationException
+     * @throws \Interop\Queue\InvalidMessageException
+     */
+    protected function queueMail(MailQueue $object, $delaySeconds = 0)
+    {
+       $producer = $this->amqpContext->createProducer();
+        if($delaySeconds > 0){
+            $producer->setDelayStrategy(new RabbitMqDlxDelayStrategy())
+                    ->setDeliveryDelay($delaySeconds * 1000);
+        }
+        $producer->send(
+            $this->amqpQueue,
+            $this->amqpContext->createMessage(
+                json_encode([
+                    'id' => $object->getId()
+                ])
+            )
+        );
     }
 }

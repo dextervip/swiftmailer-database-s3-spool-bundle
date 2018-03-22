@@ -107,9 +107,9 @@ class MailQueue
     /**
      * @var int
      *
-     * @ORM\Column(name="max_retries", type="integer", nullable=true)
+     * @ORM\Column(name="retries", type="integer", nullable=true)
      */
-    private $maxRetries = 0;
+    private $retries = -1;
 
 
     /**
@@ -389,21 +389,30 @@ class MailQueue
     /**
      * @return int
      */
-    public function getMaxRetries()
+    public function getRetries()
     {
-        return $this->maxRetries;
+        return $this->retries;
     }
 
     /**
-     * @param int $maxRetries
+     * @param int $retries
      * @return MailQueue
      */
-    public function setMaxRetries(int $maxRetries)
+    public function setRetries($retries)
     {
-        $this->maxRetries = $maxRetries;
-
+        $this->retries = $retries;
         return $this;
     }
+
+    /**
+     * @return MailQueue
+     */
+    public function increaseRetriesCount(){
+        $this->retries = $this->retries + 1;
+        return $this;
+    }
+
+
 
 
 }

@@ -246,7 +246,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
             $mailQueueObject->setErrorMessage($e->getMessage());
             if($this->maxRetries >= $mailQueueObject->getRetries()){
                 // retry and insert again into the queue with a delay
-                $this->queueMail($mailQueueObject, 60 * ($mailQueueObject->getRetries() + 1));
+                $this->queueMail($mailQueueObject, 60 * 5 * ($mailQueueObject->getRetries() + 1));
             }
             $this->entityManager->persist($mailQueueObject);
             $count = 0;
@@ -264,9 +264,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
      */
     protected function fetchMessages()
     {
-
-        $destination = $this->amqpContext->createQueue('cgonser_mail_queue');
-        $consumer = $this->amqpContext->createConsumer($destination);
+        $consumer = $this->amqpContext->createConsumer($this->amqpQueue);
 
         $limit = empty($this->getMessageLimit()) ? 100 : $this->getMessageLimit();
 
@@ -402,7 +400,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
      */
     protected function setupQueue(AmqpContext $context)
     {
-        $this->amqpQueue = $this->amqpContext->createQueue('cgonser_mail_queue');
+        $this->amqpQueue = $context->createQueue('cgonser_mail_queue');
         $this->amqpQueue->addFlag(AmqpQueue::FLAG_DURABLE);
         $context->declareQueue($this->amqpQueue);
     }

@@ -10,6 +10,7 @@ use Doctrine\ORM\Mapping\Index;
  *
  * @ORM\Table(name="cgonser_mail_queue_transport")
  * @ORM\Entity(repositoryClass="Cgonser\SwiftMailerDatabaseS3SpoolBundle\Repository\MailQueueTransportRepository")
+ * @ORM\Cache(usage="NONSTRICT_READ_WRITE")
  */
 class MailQueueTransport
 {
@@ -288,9 +289,5 @@ class MailQueueTransport
         $this->alias = $alias;
         return $this;
     }
-
-
-
-
 
 }

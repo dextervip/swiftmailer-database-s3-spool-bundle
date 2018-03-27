@@ -3,6 +3,7 @@
 namespace Cgonser\SwiftMailerDatabaseS3SpoolBundle\Spool;
 
 use Cgonser\SwiftMailerDatabaseS3SpoolBundle\Entity\MailQueue;
+use Cgonser\SwiftMailerDatabaseS3SpoolBundle\Transport\TransportChain;
 use Enqueue\AmqpTools\RabbitMqDlxDelayStrategy;
 use Interop\Amqp\AmqpContext;
 use Interop\Amqp\AmqpQueue;
@@ -37,11 +38,6 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
     protected $entityClass;
 
     /**
-     * @var string
-     */
-    protected $queue;
-
-    /**
      * @var Registry
      */
     protected $doctrine;
@@ -50,11 +46,6 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
      * @var EntityManager
      */
     protected $entityManager;
-
-    /**
-     * @var Swift_Transport
-     */
-    protected $transport;
 
     /**
      * @var AmqpContext
@@ -67,10 +58,17 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
     protected $amqpQueue;
 
     /**
+     * @var TransportChain
+     */
+    protected $transportChain;
+
+    /**
      * Max retries
      * @var int
      */
     private $maxRetries = 3;
+
+    private $disableDelivery = false;
 
     /**
      * @param string    $s3Config
@@ -78,7 +76,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
      * @param Registry  $doctrine
      */
 
-    public function __construct($s3Config, $entityClass, Registry $doctrine, AmqpContext $amqpContext, String $queue = 'default')
+    public function __construct($s3Config, $entityClass, Registry $doctrine, AmqpContext $amqpContext, TransportChain $transportChain)
     {
         $this->s3Bucket = $s3Config['bucket'];
         unset ($s3Config['bucket']);
@@ -94,7 +92,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
         $this->entityClass = $entityClass;
         $this->entityManager = $this->doctrine->getManagerForClass($this->entityClass);
         $this->amqpContext = $amqpContext;
-        $this->queue = $queue;
+        $this->transportChain = $transportChain;
 
         $this->setupQueue($amqpContext);
     }
@@ -150,8 +148,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
         }
 
         $object->setQueuedAt(new \DateTime());
-        $object->setQueue($this->queue);
-        
+
         $this->entityManager->persist($object);
         $this->entityManager->flush();
 
@@ -172,7 +169,6 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
      */
     public function flushQueue(Swift_Transport $transport, &$failedRecipients = null)
     {
-        $this->transport = $transport;
         $this->failedRecipients = (array) $failedRecipients;
 
         $count = $this->sendMessages();
@@ -192,10 +188,6 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
 
         if (!$queuedMessages || count($queuedMessages) == 0) {
             return 0;
-        }
-
-        if (!$this->transport->isStarted()) {
-            $this->transport->start();
         }
 
         $startTime = time();
@@ -233,9 +225,22 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
         try {
             $message = $this->s3RetrieveMessage($mailQueueObject->getId());
 
-            $count = $this->transport->send($message, $this->failedRecipients);
+            //initialize transport based on tags
+            $tags = $this->getMessageTags($message);
+
+            $transport = new \Swift_NullTransport();
+
+            if($this->isDisableDelivery() == false){
+                $transport = $this->transportChain->getTransportByTags($tags);
+
+                if(!$transport->isStarted()){
+                    $transport->start();
+                }
+            }
+
+            $count = $transport->send($message, $this->failedRecipients);
             if($count == 0){
-                throw new Swift_IoException('No messages were accepted for delivery.');
+                throw new \Swift_IoException('No messages were accepted for delivery.');
             }
             $mailQueueObject->setSentAt(new \DateTime());
 
@@ -309,7 +314,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
                 'ACL'    => 'private'
             ]);
         } catch (\Exception $e) {
-            throw new Swift_IoException(sprintf('Unable to store message "%s" in S3 Bucket "%s".',
+            throw new \Swift_IoException(sprintf('Unable to store message "%s" in S3 Bucket "%s".',
                 $messageId, $this->s3Bucket));
         }
 
@@ -335,10 +340,10 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
 
             return unserialize($result['Body']);
         } catch (\Aws\S3\Exception\S3Exception $e) {
-            throw new Swift_IoException(sprintf('Unable to retrieve message "%s" from S3 Bucket "%s".',
+            throw new \Swift_IoException(sprintf('Unable to retrieve message "%s" from S3 Bucket "%s".',
                 $messageId, $this->s3Bucket));
         } catch (\Exception $e) {
-            throw new Swift_IoException(sprintf('Unable to retrieve message "%s" from S3 Bucket "%s".',
+            throw new \Swift_IoException(sprintf('Unable to retrieve message "%s" from S3 Bucket "%s".',
                 $messageId, $this->s3Bucket));
         }
     }
@@ -371,7 +376,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
                 'Key'    => $this->s3Folder.'/'.$sourceKey
             ]);
         } catch (\Exception $e) {
-            throw new Swift_IoException(sprintf('Unable to arquive message "%s" in S3 Bucket "%s".', 
+            throw new \Swift_IoException(sprintf('Unable to arquive message "%s" in S3 Bucket "%s".',
                 $messageId, $this->s3Bucket));
         }
     }
@@ -428,4 +433,41 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
             )
         );
     }
+
+    /**
+     * @param $message
+     * @return array
+     */
+    protected function getMessageTags($message): array
+    {
+        $tags = [];
+        foreach ($message->getHeaders()->getAll('X-Mailer-Tag') as $tag) {
+            $tags[] = $tag->getValue();
+        }
+        return $tags;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isDisableDelivery(): bool
+    {
+        return $this->disableDelivery;
+    }
+
+    /**
+     * @param bool $disableDelivery
+     * @return DatabaseS3Spool
+     */
+    public function setDisableDelivery($disableDelivery): DatabaseS3Spool
+    {
+        $this->disableDelivery = false;
+        if($disableDelivery == true){
+            $this->disableDelivery = $disableDelivery;
+        }
+
+        return $this;
+    }
+
+
 }

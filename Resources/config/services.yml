@@ -6,7 +6,18 @@ services:
             - "%cgonser_swift_mailer_database_s3_spool.entity_class%"
             - "@doctrine"
             - "@enqueue.transport.context"
+            - "@cgonser.swift_mailer.transport_chain"
+        calls:
+         - ['setDisableDelivery', ['%cgonser_swift_mailer_database_s3_spool.delivery_disable%']]
     swiftmailer.spool.db_s3:
         alias: cgonser.swift_mailer.spool.db_s3
     swiftmailer.mailer.default.spool.db_s3:
         alias: cgonser.swift_mailer.spool.db_s3
+    Cgonser\SwiftMailerDatabaseS3SpoolBundle\Repository\MailQueueTransportRepository:
+        class: Cgonser\SwiftMailerDatabaseS3SpoolBundle\Repository\MailQueueTransportRepository
+        factory: ['@doctrine.orm.default_entity_manager', getRepository]
+        arguments:
+            - Cgonser\SwiftMailerDatabaseS3SpoolBundle\Entity\MailQueueTransport
+    cgonser.swift_mailer.transport_chain:
+        class: Cgonser\SwiftMailerDatabaseS3SpoolBundle\Transport\TransportChain
+        autowire: true

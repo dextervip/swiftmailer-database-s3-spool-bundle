@@ -45,6 +45,9 @@ class Configuration implements ConfigurationInterface
                         ->scalarNode("secret")
                             ->end()
                     ->end()
+                ->end()
+                ->scalarNode("delivery_disable")->defaultFalse()
+                    ->end()
             ->end()
         ;
 

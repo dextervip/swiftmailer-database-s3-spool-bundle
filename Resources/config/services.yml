@@ -21,3 +21,4 @@ services:
     cgonser.swift_mailer.transport_chain:
         class: Cgonser\SwiftMailerDatabaseS3SpoolBundle\Transport\TransportChain
         autowire: true
+        shared: true

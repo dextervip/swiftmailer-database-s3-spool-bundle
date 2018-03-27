@@ -38,14 +38,14 @@ class MailQueueTransport
     private $alias;
 
     /**
-     * @var string
+     * @var boolean
      *
      * @ORM\Column(name="enabled", type="boolean", nullable=false, options={"default":true})
      */
     private $enabled = true;
 
     /**
-     * @var string
+     * @var boolean
      *
      * @ORM\Column(name="default", type="boolean", nullable=false,options={"default":false})
      */
@@ -126,23 +126,39 @@ class MailQueueTransport
         return $this;
     }
 
-
-
     /**
-     * @return string
+     * @return bool
      */
-    public function getEnabled(): string
+    public function isEnabled(): bool
     {
         return $this->enabled;
     }
 
     /**
-     * @param string $enabled
+     * @param bool $enabled
      * @return MailQueueTransport
      */
-    public function setEnabled(string $enabled): MailQueueTransport
+    public function setEnabled(bool $enabled): MailQueueTransport
     {
         $this->enabled = $enabled;
+        return $this;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isDefault(): bool
+    {
+        return $this->default;
+    }
+
+    /**
+     * @param bool $default
+     * @return MailQueueTransport
+     */
+    public function setDefault(bool $default): MailQueueTransport
+    {
+        $this->default = $default;
         return $this;
     }
 

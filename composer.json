@@ -11,6 +11,7 @@
     "require" : {
     	"php": ">=5.4.0",
     	"doctrine/orm": "^2.5",
+        "doctrine/cache": "^1.6",
     	"symfony/swiftmailer-bundle": "^2.3 || ^3.0",
         "aws/aws-sdk-php": "^3.0",
         "enqueue/enqueue-bundle": "^0.8.16"

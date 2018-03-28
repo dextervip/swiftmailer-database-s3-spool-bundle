@@ -184,7 +184,23 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
      */
     protected function sendMessages()
     {
-        $queuedMessages = $this->fetchMessages();
+        $consumer = $this->amqpContext->createConsumer($this->amqpQueue);
+
+        $limit = empty($this->getMessageLimit()) ? 50 : $this->getMessageLimit();
+
+        $messages = [];
+        for ($i = 0; $i <= $limit; $i++){
+            $message = $consumer->receive(3);
+            if(empty($message)){ break; }
+            $decodedMessageBody = json_decode($message->getBody(), true);
+            $messages[$decodedMessageBody['id']] = $message;
+        }
+
+        if (!$messages || count($messages) == 0) {
+            return 0;
+        }
+
+        $queuedMessages = $this->fetchMessages(array_keys($messages));
 
         if (!$queuedMessages || count($queuedMessages) == 0) {
             return 0;
@@ -203,6 +219,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
 
         foreach ($queuedMessages as $mailQueueObject) {
             $count += $this->sendMessage($mailQueueObject);
+            $consumer->acknowledge($messages[$mailQueueObject->getId()]);
 
             if ($this->getTimeLimit() && (time() - $startTime) >= $this->getTimeLimit()) {
                 break;
@@ -261,37 +278,17 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
     }
 
     /**
-     * Sends a message
-     *
-     * @param string   $status   status of the messages to fetch
+     * Fetch messages
      *
      * @return MailQueue[]
      */
-    protected function fetchMessages()
+    protected function fetchMessages(array $messages = [])
     {
-        $consumer = $this->amqpContext->createConsumer($this->amqpQueue);
-
-        $limit = empty($this->getMessageLimit()) ? 100 : $this->getMessageLimit();
-
-        $ids = [];
-        for ($i = 0; $i <= $limit; $i++){
-            $message = $consumer->receive(10);
-            if(empty($message)){
-                break;
-            }
-            $ids[]=json_decode($message->getBody(), true);
-            $consumer->acknowledge($message);
-        }
-
-        if(count($ids) > 0 ) {
-            $qb = $this->entityManager->getRepository($this->entityClass)
-                ->createQueryBuilder('m');
-            $qb->andWhere($qb->expr()->in('m.id', ':ids'))
-                ->setParameter(':ids', array_column($ids, 'id'));
-            return $qb->getQuery()->getResult();
-        }
-
-        return [];
+        $qb = $this->entityManager->getRepository($this->entityClass)
+            ->createQueryBuilder('m');
+        $qb->andWhere($qb->expr()->in('m.id', ':ids'))
+            ->setParameter(':ids', $messages);
+        return $qb->getQuery()->getResult();
     }
 
     /**

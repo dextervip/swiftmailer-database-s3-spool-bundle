@@ -111,6 +111,13 @@ class MailQueue
      */
     private $retries = -1;
 
+    /**
+     * @ORM\OneToOne(targetEntity="Cgonser\SwiftMailerDatabaseS3SpoolBundle\Entity\MailQueueTransport")
+     * @ORM\JoinColumn(name="mail_queue_transport_id", referencedColumnName="id")
+     * @var MailQueueTransport
+     */
+    private $mailQueueTransport;
+
 
     /**
      * Get id
@@ -401,6 +408,24 @@ class MailQueue
     public function setRetries($retries)
     {
         $this->retries = $retries;
+        return $this;
+    }
+
+    /**
+     * @return MailQueueTransport
+     */
+    public function getMailQueueTransport(): MailQueueTransport
+    {
+        return $this->mailQueueTransport;
+    }
+
+    /**
+     * @param MailQueueTransport $mailQueueTransport
+     * @return MailQueue
+     */
+    public function setMailQueueTransport(MailQueueTransport $mailQueueTransport): MailQueue
+    {
+        $this->mailQueueTransport = $mailQueueTransport;
         return $this;
     }
 

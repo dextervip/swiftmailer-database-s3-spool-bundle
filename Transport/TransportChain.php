@@ -36,15 +36,15 @@ class TransportChain
     }
 
 
-    public function addTransport(\Swift_Transport $transport, $alias)
+    public function addSwiftTransport(\Swift_Transport $transport, $alias)
     {
         $this->swiftMailerTransports[$alias] = $transport;
     }
 
     /**
-     * @return \Swift_Transport
+     * @return array
      */
-    public function getTransports()
+    public function getSwiftTransports()
     {
         return $this->swiftMailerTransports;
     }
@@ -52,16 +52,32 @@ class TransportChain
     /**
      * @return \Swift_Transport
      */
-    public function getTransport($alias): \Swift_Transport
+    public function getSwiftTransport($alias): \Swift_Transport
     {
         if (array_key_exists($alias, $this->swiftMailerTransports)) {
             return $this->swiftMailerTransports[$alias];
         }
 
-        throw new \Exception('No transports were found.');
+        throw new \Exception('No swift transport was found.');
     }
 
-    public function getTransportByTags(array $tags): \Swift_Transport
+
+    /**
+     * @return \MailQueueTransport
+     */
+    public function getTransport($alias): MailQueueTransport
+    {
+        foreach ($this->transports as $transport){
+            /** @var MailQueueTransport $transport */
+            if($transport->getAlias() == $alias){
+                return $transport;
+            }
+        }
+
+        throw new \Exception('No transport was found.');
+    }
+
+    public function getTransportByTags(array $tags): array
     {
         $score = [];
         $defaultTransport = null;
@@ -86,11 +102,17 @@ class TransportChain
 
         if (count($score) > 0) {
             arsort($score);
-            return $this->getTransport(key($score));
+            return [
+              'MailQueueTransport'  => $this->getTransport(key($score)),
+              'Swift_Transport'  => $this->getSwiftTransport(key($score))
+            ];
         }
 
         if ($defaultTransport instanceof MailQueueTransport) {
-            return $this->getTransport($defaultTransport->getAlias());
+            return [
+                'MailQueueTransport'  => $defaultTransport,
+                'Swift_Transport'  => $this->getSwiftTransport($defaultTransport->getAlias())
+            ];
         }
 
         throw new \Exception('No transports were found.');
@@ -114,8 +136,9 @@ class TransportChain
             $swiftTransport = (new \Swift_SmtpTransport($transport->getHost(), $transport->getPort()))
                 ->setUsername($transport->getUsername())
                 ->setPassword($transport->getPassword())
-                ->setEncryption($transport->getEncryption());
-            $this->addTransport($swiftTransport, $transport->getAlias());
+                ->setEncryption($transport->getEncryption())
+            ;
+            $this->addSwiftTransport($swiftTransport, $transport->getAlias());
         }
     }
 }

@@ -245,21 +245,24 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
             //initialize transport based on tags
             $tags = $this->getMessageTags($message);
 
-            $transport = new \Swift_NullTransport();
+            $swiftTransport = new \Swift_NullTransport();
 
             if($this->isDisableDelivery() == false){
                 $transport = $this->transportChain->getTransportByTags($tags);
 
-                if(!$transport->isStarted()){
-                    $transport->start();
+                $swiftTransport = $transport['Swift_Transport'];
+
+                if(!$swiftTransport->isStarted()){
+                    $swiftTransport->start();
                 }
             }
 
-            $count = $transport->send($message, $this->failedRecipients);
+            $count = $swiftTransport->send($message, $this->failedRecipients);
             if($count == 0){
                 throw new \Swift_IoException('No messages were accepted for delivery.');
             }
             $mailQueueObject->setSentAt(new \DateTime());
+            $mailQueueObject->setMailQueueTransport($transport['MailQueueTransport']);
 
             $this->entityManager->persist($mailQueueObject);
             $this->entityManager->flush();

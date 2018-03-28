@@ -69,7 +69,12 @@ class TransportChain
             /** @var MailQueueTransport $transport */
             $score[$transport->getAlias()] = 0;
             foreach ($transport->getTags() as $tag) {
-                $score[$transport->getAlias()] += in_array($tag, $tags) ? 1 : 0;
+                if(substr($tag,0,1) == '-' && in_array(substr($tag,1), $tags) ){
+                    $score[$transport->getAlias()] = 0;
+                    break;
+                }else{
+                    $score[$transport->getAlias()] += in_array($tag, $tags) ? 1 : 0;
+                }
             }
             if ($score[$transport->getAlias()] == 0) {
                 unset($score[$transport->getAlias()]);

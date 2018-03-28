@@ -414,7 +414,7 @@ class MailQueue
     /**
      * @return MailQueueTransport
      */
-    public function getMailQueueTransport(): MailQueueTransport
+    public function getMailQueueTransport(): ?MailQueueTransport
     {
         return $this->mailQueueTransport;
     }
@@ -423,7 +423,7 @@ class MailQueue
      * @param MailQueueTransport $mailQueueTransport
      * @return MailQueue
      */
-    public function setMailQueueTransport(MailQueueTransport $mailQueueTransport): MailQueue
+    public function setMailQueueTransport(MailQueueTransport $mailQueueTransport = null): MailQueue
     {
         $this->mailQueueTransport = $mailQueueTransport;
         return $this;

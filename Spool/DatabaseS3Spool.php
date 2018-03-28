@@ -242,28 +242,25 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
         try {
             $message = $this->s3RetrieveMessage($mailQueueObject->getId());
 
-            //initialize transport based on tags
-            $tags = $this->getMessageTags($message);
-
-            $swiftTransport = new \Swift_NullTransport();
+            $transport['Swift_Transport'] = new \Swift_NullTransport();
+            $transport['MailQueueTransport'] = null;
 
             if($this->isDisableDelivery() == false){
+                //initialize transport based on tags
+                $tags = $this->getMessageTags($message);
                 $transport = $this->transportChain->getTransportByTags($tags);
 
-                $swiftTransport = $transport['Swift_Transport'];
-
-                if(!$swiftTransport->isStarted()){
-                    $swiftTransport->start();
+                if(!$transport['Swift_Transport']->isStarted()){
+                    $transport['Swift_Transport']->start();
                 }
             }
+            $mailQueueObject->setMailQueueTransport($transport['MailQueueTransport']);
 
-            $count = $swiftTransport->send($message, $this->failedRecipients);
+            $count = $transport['Swift_Transport']->send($message, $this->failedRecipients);
             if($count == 0){
                 throw new \Swift_IoException('No messages were accepted for delivery.');
             }
             $mailQueueObject->setSentAt(new \DateTime());
-            $mailQueueObject->setMailQueueTransport($transport['MailQueueTransport']);
-
             $this->entityManager->persist($mailQueueObject);
             $this->entityManager->flush();
             $this->s3ArquiveMessage($mailQueueObject->getId());

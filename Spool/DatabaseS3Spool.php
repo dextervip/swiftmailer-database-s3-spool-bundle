@@ -3,6 +3,7 @@
 namespace Cgonser\SwiftMailerDatabaseS3SpoolBundle\Spool;
 
 use Cgonser\SwiftMailerDatabaseS3SpoolBundle\Entity\MailQueue;
+use Cgonser\SwiftMailerDatabaseS3SpoolBundle\Entity\MailQueueTransport;
 use Cgonser\SwiftMailerDatabaseS3SpoolBundle\Transport\TransportChain;
 use Enqueue\AmqpTools\RabbitMqDlxDelayStrategy;
 use Interop\Amqp\AmqpContext;
@@ -255,6 +256,15 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
                 }
             }
             $mailQueueObject->setMailQueueTransport($transport['MailQueueTransport']);
+            $this->entityManager->persist($mailQueueObject);
+
+            //if sending is paused, delay it for one hour
+            if($transport['MailQueueTransport'] instanceof MailQueueTransport && $transport['MailQueueTransport']->isPaused()){
+                $mailQueueObject->setErrorMessage('Message delayed for one hour. The mail transport is paused.');
+                $this->entityManager->persist($mailQueueObject);
+                $this->queueMail($mailQueueObject, 60 * 60);
+                return 0;
+            }
 
             $count = $transport['Swift_Transport']->send($message, $this->failedRecipients);
             if($count == 0){

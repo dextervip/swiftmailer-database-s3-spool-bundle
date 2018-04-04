@@ -47,6 +47,13 @@ class MailQueueTransport
     /**
      * @var boolean
      *
+     * @ORM\Column(name="paused", type="boolean", nullable=false, options={"default":false})
+     */
+    private $paused = false;
+
+    /**
+     * @var boolean
+     *
      * @ORM\Column(name="default", type="boolean", nullable=false,options={"default":false})
      */
     private $default = false;
@@ -141,6 +148,24 @@ class MailQueueTransport
     public function setEnabled(bool $enabled): MailQueueTransport
     {
         $this->enabled = $enabled;
+        return $this;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isPaused(): bool
+    {
+        return $this->paused;
+    }
+
+    /**
+     * @param bool $paused
+     * @return MailQueueTransport
+     */
+    public function setPaused(bool $paused): MailQueueTransport
+    {
+        $this->paused = $paused;
         return $this;
     }
 

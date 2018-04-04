@@ -437,6 +437,13 @@ class MailQueue
         return $this;
     }
 
+    /**
+     * @return MailQueue
+     */
+    public function resetRetriesCount(){
+        $this->retries = -1;
+        return $this;
+    }
 
 
 

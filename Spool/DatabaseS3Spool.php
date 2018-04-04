@@ -261,6 +261,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
             //if sending is paused, delay it for one hour
             if($transport['MailQueueTransport'] instanceof MailQueueTransport && $transport['MailQueueTransport']->isPaused()){
                 $mailQueueObject->setErrorMessage('Message delayed for one hour. The mail transport is paused.');
+                $mailQueueObject->resetRetriesCount();
                 $this->entityManager->persist($mailQueueObject);
                 $this->queueMail($mailQueueObject, 60 * 60);
                 return 0;

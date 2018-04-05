@@ -254,9 +254,6 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
                 $mailQueueObject->setMailQueueTransport($transport['MailQueueTransport']);
                 $this->entityManager->persist($mailQueueObject);
 
-                if(!$transport['Swift_Transport']->isStarted()){
-                    $transport['Swift_Transport']->start();
-                }
             }
 
             //if sending is paused, delay it for one hour
@@ -268,7 +265,12 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
                 return 0;
             }
 
+
+            if(!$transport['Swift_Transport']->isStarted()){
+                $transport['Swift_Transport']->start();
+            }
             $count = $transport['Swift_Transport']->send($message, $this->failedRecipients);
+            
             if($count == 0){
                 throw new \Swift_IoException('No messages were accepted for delivery.');
             }

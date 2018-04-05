@@ -77,6 +77,13 @@ class MailQueue
     private $errorMessage;
 
     /**
+     * @var string
+     *
+     * @ORM\Column(name="deduplication_hash", type="text", nullable=true)
+     */
+    private $deduplicationHash;
+
+    /**
      * @var \DateTime
      *
      * @ORM\Column(name="queued_at", type="datetime", nullable=true)
@@ -445,6 +452,22 @@ class MailQueue
         return $this;
     }
 
+    /**
+     * @return string
+     */
+    public function getDeduplicationHash(): ?string
+    {
+        return $this->deduplicationHash;
+    }
 
+    /**
+     * @param string $deduplicationHash
+     * @return MailQueue
+     */
+    public function setDeduplicationHash(string $deduplicationHash = null): MailQueue
+    {
+        $this->deduplicationHash = $deduplicationHash;
+        return $this;
+    }
 
 }

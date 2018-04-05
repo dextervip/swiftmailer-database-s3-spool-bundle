@@ -27,6 +27,7 @@ class CgonserSwiftMailerDatabaseS3SpoolExtension extends Extension
         $container->setParameter("cgonser_swift_mailer_database_s3_spool.s3", $config["s3"]);
         $container->setParameter("cgonser_swift_mailer_database_s3_spool.entity_class", $config["entity_class"]);
         $container->setParameter("cgonser_swift_mailer_database_s3_spool.delivery_disable", $config["delivery_disable"]);
+        $container->setParameter("cgonser_swift_mailer_database_s3_spool.deduplication_period", $config["deduplication_period"]);
 
         $loader = new Loader\YamlFileLoader($container, new FileLocator(__DIR__.'/../Resources/config'));
         $loader->load('services.yml');

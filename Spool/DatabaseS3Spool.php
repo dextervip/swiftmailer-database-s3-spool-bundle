@@ -15,6 +15,7 @@ use Swift_IoException;
 use Aws\S3\S3Client;
 use Doctrine\Bundle\DoctrineBundle\Registry;
 use Doctrine\ORM\EntityManager;
+use Doctrine\Common\Cache\CacheProvider;
 
 class DatabaseS3Spool extends Swift_ConfigurableSpool
 {
@@ -64,12 +65,27 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
     protected $transportChain;
 
     /**
+     * @var CacheProvider
+     */
+    protected $cache;
+
+    /**
      * Max retries
      * @var int
      */
     private $maxRetries = 3;
 
+    /**
+     * Disable develiry setting transport to null transport
+     * @var bool
+     */
     private $disableDelivery = false;
+
+    /**
+     * Deduplication period in seconds
+     * @var int|null
+     */
+    private $deduplicationPeriod;
 
     /**
      * @param string    $s3Config
@@ -77,7 +93,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
      * @param Registry  $doctrine
      */
 
-    public function __construct($s3Config, $entityClass, Registry $doctrine, AmqpContext $amqpContext, TransportChain $transportChain)
+    public function __construct($s3Config, $entityClass, Registry $doctrine, AmqpContext $amqpContext, TransportChain $transportChain, CacheProvider $cache = null)
     {
         $this->s3Bucket = $s3Config['bucket'];
         unset ($s3Config['bucket']);
@@ -94,6 +110,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
         $this->entityManager = $this->doctrine->getManagerForClass($this->entityClass);
         $this->amqpContext = $amqpContext;
         $this->transportChain = $transportChain;
+        $this->cache = $cache;
 
         $this->setupQueue($amqpContext);
     }
@@ -131,6 +148,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
      */
     public function queueMessage(Swift_Mime_Message $message)
     {
+        /** @var MailQueue $object */
         $object = new $this->entityClass;
 
         $from = $this->sanitizeAddresses(array_keys($message->getFrom()))[0];
@@ -149,6 +167,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
         }
 
         $object->setQueuedAt(new \DateTime());
+        $object->setDeduplicationHash($this->generateMessageDeduplicationHash($message));
 
         $this->entityManager->persist($object);
         $this->entityManager->flush();
@@ -246,6 +265,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
             $transport['Swift_Transport'] = new \Swift_NullTransport();
             $transport['MailQueueTransport'] = null;
 
+            //disable feature
             if($this->isDisableDelivery() == false){
                 //initialize transport based on tags
                 $tags = $this->getMessageTags($message);
@@ -256,7 +276,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
 
             }
 
-            //if sending is paused, delay it for one hour
+            //pause feature
             if($transport['MailQueueTransport'] instanceof MailQueueTransport && $transport['MailQueueTransport']->isPaused()){
                 $mailQueueObject->setErrorMessage('Message delayed for one hour. The mail transport is paused.');
                 $mailQueueObject->resetRetriesCount();
@@ -265,12 +285,26 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
                 return 0;
             }
 
+            //deduplication feature
+            if(!empty($this->getDeduplicationPeriod())){
+                if(!$this->cache instanceof CacheProvider){
+                    throw new \Exception('You must enable doctrine second level cache to use this feature.');
+                }
+                $hashKey = '[cgonser_mail_queue][deduplication]['.$mailQueueObject->getDeduplicationHash().']';
+                if($id = $this->cache->fetch($hashKey)){
+                    $mailQueueObject->setErrorMessage('Sending cancelled. This message duplicates message id '.$id);
+                    $this->entityManager->persist($mailQueueObject);
+                    return 0;
+                }
+                $this->cache->save($hashKey, $mailQueueObject->getId(), $this->getDeduplicationPeriod());
+            }
+
 
             if(!$transport['Swift_Transport']->isStarted()){
                 $transport['Swift_Transport']->start();
             }
             $count = $transport['Swift_Transport']->send($message, $this->failedRecipients);
-            
+
             if($count == 0){
                 throw new \Swift_IoException('No messages were accepted for delivery.');
             }
@@ -458,6 +492,16 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
         return $tags;
     }
 
+    public function generateMessageDeduplicationHash(\Swift_Message $message){
+        $string = implode(';',$message->getTo()) . implode(';',$message->getCc()) . implode(';',$message->getBcc()) . $message->getSubject() . $message->getBody();
+
+        if(empty($string)){
+            return null;
+        }
+
+        return hash('sha512', $string);
+    }
+
     /**
      * @return bool
      */
@@ -480,5 +524,22 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
         return $this;
     }
 
+    /**
+     * @return int|null
+     */
+    public function getDeduplicationPeriod(): ?int
+    {
+        return $this->deduplicationPeriod;
+    }
+
+    /**
+     * @param int|null $deduplicationPeriod
+     * @return DatabaseS3Spool
+     */
+    public function setDeduplicationPeriod(?int $deduplicationPeriod): DatabaseS3Spool
+    {
+        $this->deduplicationPeriod = $deduplicationPeriod;
+        return $this;
+    }
 
 }

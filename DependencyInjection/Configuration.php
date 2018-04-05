@@ -48,7 +48,7 @@ class Configuration implements ConfigurationInterface
                 ->end()
                 ->scalarNode("delivery_disable")->defaultFalse()
                     ->end()
-                ->integerNode("deduplication_period")->defaultNull()
+                ->scalarNode("deduplication_period")->defaultNull()
                     ->end()
             ->end()
         ;

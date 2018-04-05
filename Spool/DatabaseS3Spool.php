@@ -187,7 +187,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
     {
         $consumer = $this->amqpContext->createConsumer($this->amqpQueue);
 
-        $limit = empty($this->getMessageLimit()) ? 50 : $this->getMessageLimit();
+        $limit = empty($this->getMessageLimit()) ? 10 : $this->getMessageLimit();
 
         $messages = [];
         for ($i = 0; $i <= $limit; $i++){
@@ -251,12 +251,13 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
                 $tags = $this->getMessageTags($message);
                 $transport = $this->transportChain->getTransportByTags($tags);
 
+                $mailQueueObject->setMailQueueTransport($transport['MailQueueTransport']);
+                $this->entityManager->persist($mailQueueObject);
+
                 if(!$transport['Swift_Transport']->isStarted()){
                     $transport['Swift_Transport']->start();
                 }
             }
-            $mailQueueObject->setMailQueueTransport($transport['MailQueueTransport']);
-            $this->entityManager->persist($mailQueueObject);
 
             //if sending is paused, delay it for one hour
             if($transport['MailQueueTransport'] instanceof MailQueueTransport && $transport['MailQueueTransport']->isPaused()){

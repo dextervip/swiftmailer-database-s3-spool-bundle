@@ -493,7 +493,12 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
     }
 
     public function generateMessageDeduplicationHash(\Swift_Message $message){
-        $string = implode(';',$message->getTo()) . implode(';',$message->getCc()) . implode(';',$message->getBcc()) . $message->getSubject() . $message->getBody();
+
+        $string = implode(';',array_keys($message->getTo())) .
+            implode(';',array_keys($message->getCc())) .
+            implode(';',array_keys($message->getBcc())) .
+            $message->getSubject() .
+            $message->getBody();
 
         if(empty($string)){
             return null;

@@ -230,15 +230,17 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
         $count = 0;
 
         foreach ($queuedMessages as $mailQueueObject) {
-            /** @var $mailQueueObject MailQueue */
+
             $mailQueueObject->setStartedAt(new \DateTime());
             $mailQueueObject->increaseRetriesCount();
             $this->entityManager->persist($mailQueueObject);
-        }
-        $this->entityManager->flush();
+            $this->entityManager->flush();
 
-        foreach ($queuedMessages as $mailQueueObject) {
-            $count += $this->sendMessage($mailQueueObject);
+            /** @var $mailQueueObject MailQueue */
+            if(empty($mailQueueObject->getSentAt())){
+                $count += $this->sendMessage($mailQueueObject);
+            }
+
             $consumer->acknowledge($messages[$mailQueueObject->getId()]);
 
             if ($this->getTimeLimit() && (time() - $startTime) >= $this->getTimeLimit()) {

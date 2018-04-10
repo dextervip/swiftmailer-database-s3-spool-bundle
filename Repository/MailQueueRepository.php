@@ -10,4 +10,22 @@ namespace Cgonser\SwiftMailerDatabaseS3SpoolBundle\Repository;
  */
 class MailQueueRepository extends \Doctrine\ORM\EntityRepository
 {
+
+    public function getFailedMessages($limit = null){
+
+        $qb = $this->createQueryBuilder('m');
+        $qb->andWhere($qb->expr()->isNull('m.sentAt'))
+           ->andWhere($qb->expr()->isNotNull('m.startedAt'))
+           ->andWhere($qb->expr()->isNotNull('m.errorMessage'))
+           ->addOrderBy('m.startedAt', 'ASC')
+        ;
+
+        if(!empty($limit)){
+            $qb->setMaxResults($limit);
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
+
 }

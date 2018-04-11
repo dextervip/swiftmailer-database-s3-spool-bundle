@@ -190,7 +190,7 @@ class MailQueueTransport
     /**
      * @return string
      */
-    public function getSender(): string
+    public function getSender(): ?string
     {
         return $this->sender;
     }

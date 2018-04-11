@@ -281,6 +281,15 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
 
             }
 
+            //if transport has a sender, update it
+            if(!empty($transport['MailQueueTransport']->getSender())){
+                $sender = $transport['MailQueueTransport']->getSender();
+                $message->setFrom($sender);
+                $mailQueueObject->setSender($sender);
+                $this->entityManager->persist($mailQueueObject);
+                //$message->setSender($sender);
+            }
+
             //pause feature
             if($transport['MailQueueTransport'] instanceof MailQueueTransport && $transport['MailQueueTransport']->isPaused()){
                 $mailQueueObject->setErrorMessage('Message delayed for one hour. The mail transport is paused.');

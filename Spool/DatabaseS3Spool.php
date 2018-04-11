@@ -222,10 +222,6 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
 
         $queuedMessages = $this->fetchMessages(array_keys($messages));
 
-        if (!$queuedMessages || count($queuedMessages) == 0) {
-            return 0;
-        }
-
         $startTime = time();
         $count = 0;
 
@@ -242,11 +238,18 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
             }
 
             $consumer->acknowledge($messages[$mailQueueObject->getId()]);
+            unset($messages[$mailQueueObject->getId()]);
 
             if ($this->getTimeLimit() && (time() - $startTime) >= $this->getTimeLimit()) {
                 break;
             }
         }
+
+        //Messages that doesn't exists anymore in database
+        foreach ($messages as $key => $message){
+            $consumer->acknowledge($message);
+        }
+
         $this->entityManager->flush();
 
         return $count;
@@ -292,6 +295,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
                 if(!$this->cache instanceof CacheProvider){
                     throw new \Exception('You must enable doctrine second level cache to use this feature.');
                 }
+                $mailQueueObject->setDeduplicationHash($this->generateMessageDeduplicationHash($message));
                 $hashKey = '[cgonser_mail_queue][deduplication]['.$mailQueueObject->getDeduplicationHash().']';
                 if($id = $this->cache->fetch($hashKey)){
                     $mailQueueObject->setErrorMessage('Sending cancelled. This message duplicates message id '.$id);
@@ -373,7 +377,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
      *
      * @param Integer $messageId The message ID
      *
-     * @return Swift_Message
+     * @return \Swift_Message
      */
     protected function s3RetrieveMessage($messageId)
     {

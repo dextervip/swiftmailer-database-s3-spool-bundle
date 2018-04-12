@@ -328,6 +328,11 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
             $this->entityManager->flush();
             $this->s3ArquiveMessage($mailQueueObject->getId());
         } catch (\Exception $e) {
+            //sending failed, delete deduplication entry
+            if(!empty($this->getDeduplicationPeriod())){
+                $hashKey = '[cgonser_mail_queue][deduplication]['.$mailQueueObject->getDeduplicationHash().']';
+                $this->cache->delete($hashKey);
+            }
             $mailQueueObject->setErrorMessage($e->getMessage());
             if($this->maxRetries >= $mailQueueObject->getRetries()){
                 // retry and insert again into the queue with a delay

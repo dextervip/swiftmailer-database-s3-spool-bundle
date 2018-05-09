@@ -154,6 +154,8 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
         $from = $this->sanitizeAddresses(array_keys($message->getFrom()))[0];
         $recipient = $this->sanitizeAddresses(array_keys($message->getTo()));
 
+        //truncate long subject
+        $message->setSubject(mb_substr($message->getSubject(),0,255));
         $object->setSubject($message->getSubject());
         $object->setSender($from);
         $object->setRecipient(implode(';', $recipient));

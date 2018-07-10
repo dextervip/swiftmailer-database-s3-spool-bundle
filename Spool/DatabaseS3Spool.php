@@ -8,7 +8,7 @@ use Cgonser\SwiftMailerDatabaseS3SpoolBundle\Transport\TransportChain;
 use Enqueue\AmqpTools\RabbitMqDlxDelayStrategy;
 use Interop\Amqp\AmqpContext;
 use Interop\Amqp\AmqpQueue;
-use Swift_Mime_Message;
+use Swift_Mime_SimpleMessage;
 use Swift_Transport;
 use Swift_ConfigurableSpool;
 use Swift_IoException;
@@ -142,11 +142,11 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
     /**
      * Queues a message.
      *
-     * @param Swift_Mime_Message $message The message to store
+     * @param Swift_Mime_SimpleMessage $message The message to store
      *
      * @return bool
      */
-    public function queueMessage(Swift_Mime_Message $message)
+    public function queueMessage(Swift_Mime_SimpleMessage $message)
     {
         /** @var MailQueue $object */
         $object = new $this->entityClass;
@@ -365,7 +365,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
      * Stores serialized message on S3.
      *
      * @param Integer $messageId The message ID
-     * @param Swift_Mime_Message $message The message to store
+     * @param Swift_Mime_SimpleMessage $message The message to store
      *
      * @return bool
      */

@@ -505,7 +505,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
      * @param $message
      * @return array
      */
-    protected function getMessageTags($message): array
+    protected function getMessageTags(\Swift_Message $message): array
     {
         $tags = [];
         foreach ($message->getHeaders()->getAll('X-Mailer-Tag') as $tag) {

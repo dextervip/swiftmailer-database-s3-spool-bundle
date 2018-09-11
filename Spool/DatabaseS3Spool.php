@@ -219,6 +219,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
         }
 
         if (!$messages || count($messages) == 0) {
+            sleep(5);
             return 0;
         }
 

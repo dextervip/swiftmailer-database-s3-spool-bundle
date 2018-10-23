@@ -8,6 +8,7 @@ use Cgonser\SwiftMailerDatabaseS3SpoolBundle\Transport\TransportChain;
 use Enqueue\AmqpTools\RabbitMqDlxDelayStrategy;
 use Interop\Amqp\AmqpContext;
 use Interop\Amqp\AmqpQueue;
+use Psr\Log\LoggerInterface;
 use Swift_Mime_SimpleMessage;
 use Swift_Transport;
 use Swift_ConfigurableSpool;
@@ -69,6 +70,9 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
      */
     protected $cache;
 
+    /** @var LoggerInterface */
+    protected $logger;
+
     /**
      * Max retries
      * @var int
@@ -93,7 +97,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
      * @param Registry  $doctrine
      */
 
-    public function __construct($s3Config, $entityClass, Registry $doctrine, AmqpContext $amqpContext, TransportChain $transportChain, CacheProvider $cache = null)
+    public function __construct($s3Config, $entityClass, Registry $doctrine, AmqpContext $amqpContext, TransportChain $transportChain, CacheProvider $cache = null, LoggerInterface $logger)
     {
         $this->s3Bucket = $s3Config['bucket'];
         unset ($s3Config['bucket']);
@@ -111,6 +115,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
         $this->amqpContext = $amqpContext;
         $this->transportChain = $transportChain;
         $this->cache = $cache;
+        $this->logger = $logger;
 
         $this->setupQueue($amqpContext);
     }
@@ -331,6 +336,7 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
             $this->entityManager->flush();
             $this->s3ArquiveMessage($mailQueueObject->getId());
         } catch (\Exception $e) {
+            $this->logger->error((string) $e);
             //sending failed, delete deduplication entry
             if(!empty($this->getDeduplicationPeriod())){
                 $hashKey = '[cgonser_mail_queue][deduplication]['.$mailQueueObject->getDeduplicationHash().']';

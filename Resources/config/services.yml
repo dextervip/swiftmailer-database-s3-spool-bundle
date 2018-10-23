@@ -8,6 +8,7 @@ services:
             - "@enqueue.transport.context"
             - "@cgonser.swift_mailer.transport_chain"
             - "@doctrine.orm.default_second_level_cache.region_cache_driver"
+            - "@logger"
         calls:
          - ['setDisableDelivery', ['%cgonser_swift_mailer_database_s3_spool.delivery_disable%']]
          - ['setDeduplicationPeriod', ['%cgonser_swift_mailer_database_s3_spool.deduplication_period%']]

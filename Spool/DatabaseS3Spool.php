@@ -173,6 +173,8 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
             $object->setBcc(implode(';', $this->sanitizeAddresses(array_keys($bcc))));
         }
 
+
+
         $object->setQueuedAt(new \DateTime());
         $object->setDeduplicationHash($this->generateMessageDeduplicationHash($message));
 
@@ -523,11 +525,11 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
 
     public function generateMessageDeduplicationHash(\Swift_Message $message){
 
-        $string = implode(';',array_keys($message->getTo())) .
-            implode(';',array_keys($message->getCc())) .
-            implode(';',array_keys($message->getBcc())) .
-            $message->getSubject() .
-            $message->getBody();
+
+        $string = empty($message->getTo()) ? '' : implode(';',array_keys($message->getTo()));
+        $string .= empty($message->getCc()) ? '' : implode(';',array_keys($message->getCc()));
+        $string .= empty($message->getBcc()) ? '' : implode(';',array_keys($message->getBcc()));
+        $string .= $message->getSubject() . $message->getBody();
 
         if(empty($string)){
             return null;

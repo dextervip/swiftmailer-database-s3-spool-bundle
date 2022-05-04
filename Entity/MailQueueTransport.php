@@ -54,7 +54,7 @@ class MailQueueTransport
     /**
      * @var boolean
      *
-     * @ORM\Column(name="default", type="boolean", nullable=false,options={"default":false})
+     * @ORM\Column(name="`default`", type="boolean", nullable=false,options={"default":false})
      */
     private $default = false;
 
@@ -118,7 +118,7 @@ class MailQueueTransport
     /**
      * @return string
      */
-    public function getName(): string
+    public function getName(): ?string
     {
         return $this->name;
     }
@@ -208,7 +208,7 @@ class MailQueueTransport
     /**
      * @return string
      */
-    public function getHost(): string
+    public function getHost(): ?string
     {
         return $this->host;
     }
@@ -226,7 +226,7 @@ class MailQueueTransport
     /**
      * @return string
      */
-    public function getUsername(): string
+    public function getUsername(): ?string
     {
         return $this->username;
     }
@@ -244,7 +244,7 @@ class MailQueueTransport
     /**
      * @return string
      */
-    public function getPassword(): string
+    public function getPassword(): ?string
     {
         return $this->password;
     }
@@ -262,7 +262,7 @@ class MailQueueTransport
     /**
      * @return string
      */
-    public function getPort(): string
+    public function getPort(): ?string
     {
         return $this->port;
     }
@@ -280,7 +280,7 @@ class MailQueueTransport
     /**
      * @return string
      */
-    public function getEncryption(): string
+    public function getEncryption(): ?string
     {
         return $this->encryption;
     }
@@ -298,7 +298,7 @@ class MailQueueTransport
     /**
      * @return array
      */
-    public function getTags(): array
+    public function getTags(): ?array
     {
         return $this->tags;
     }
@@ -316,7 +316,7 @@ class MailQueueTransport
     /**
      * @return string
      */
-    public function getAlias(): string
+    public function getAlias(): ?string
     {
         return $this->alias;
     }

@@ -294,10 +294,13 @@ class DatabaseS3Spool extends Swift_ConfigurableSpool
             //if transport has a sender, update it
             if(!empty($transport['MailQueueTransport']->getSender())){
                 $sender = $transport['MailQueueTransport']->getSender();
-                $message->setFrom($sender);
+                if(preg_match("/(?P<sender_name>[\w\s]+)<(?P<sender_address>[\w\.]+@[\w\.]+)>/i", $sender, $matches)){
+                    $message->setFrom(trim($matches['sender_address']), trim($matches['sender_name']));
+                }else{
+                    $message->setFrom($sender);
+                }
                 $mailQueueObject->setSender($sender);
                 $this->entityManager->persist($mailQueueObject);
-                //$message->setSender($sender);
             }
 
             //pause feature

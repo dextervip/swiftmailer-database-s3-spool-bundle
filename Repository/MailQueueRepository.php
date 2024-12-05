@@ -17,7 +17,7 @@ class MailQueueRepository extends \Doctrine\ORM\EntityRepository
         $qb->andWhere($qb->expr()->isNull('m.sentAt'))
            ->andWhere($qb->expr()->isNotNull('m.startedAt'))
            ->andWhere($qb->expr()->isNotNull('m.errorMessage'))
-           ->addOrderBy('m.startedAt', 'ASC')
+           ->addOrderBy('m.startedAt', 'DESC')
         ;
 
         if(!empty($limit)){
